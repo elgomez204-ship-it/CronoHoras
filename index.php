@@ -60,14 +60,14 @@ layout_header(tr('loginTitle'));
     <section class="login-panel p-8">
       <div class="mb-8 text-center">
         <div class="mx-auto mb-5 flex h-20 w-20 items-center justify-center">
-          <div class="brand-badge" style="background:#2563eb !important;">
+          <div class="brand-badge">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="0" fill="none" />
               <path d="M12 7v6l4 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
             </svg>
           </div>
         </div>
-        <p class="text-xs font-bold uppercase tracking-widest text-blue-400 mb-1">Control de Horas</p><h1 class="text-3xl font-semibold tracking-tight text-foreground">CronoHoras</h1>
+        <h1 class="text-3xl font-semibold tracking-tight text-foreground">Control de Horas</h1>
         <p class="mt-3 text-sm text-muted-foreground lead">Gestión de tiempo en tiempo real.</p>
       </div>
 
@@ -144,7 +144,7 @@ layout_header(tr('loginTitle'));
       </form>
 
       <div class="mt-6 text-center text-sm text-slate-500">
-        ¿No tienes cuenta? <a href="register.php" style="color:#2563eb;font-weight:700;text-decoration:none;"><?php echo tr('createAccount'); ?></a>
+        ¿No tienes cuenta? <a href="register.php" class="link"><?php echo tr('createAccount'); ?></a>
       </div>
     </section>
   </main>

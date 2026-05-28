@@ -4,8 +4,15 @@ ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 session_start();
-date_default_timezone_set('Europe/Madrid');
 require_once __DIR__ . '/db.php';
+
+// Process locale/theme switches immediately so they take effect on current page
+if (!empty($_GET['locale']) && in_array($_GET['locale'], ['es', 'en'], true)) {
+    $_SESSION['locale'] = $_GET['locale'];
+}
+if (!empty($_GET['theme']) && in_array($_GET['theme'], ['light', 'dark'], true)) {
+    $_SESSION['theme'] = $_GET['theme'];
+}
 
 function current_user(): ?array {
     if (empty($_SESSION['user_id'])) {
@@ -17,9 +24,6 @@ function current_user(): ?array {
 }
 
 function current_locale(): string {
-    if (!empty($_GET['locale']) && in_array($_GET['locale'], ['es', 'en'], true)) {
-        set_locale($_GET['locale']);
-    }
     if (!empty($_SESSION['locale'])) {
         return $_SESSION['locale'];
     }
@@ -28,9 +32,6 @@ function current_locale(): string {
 }
 
 function current_theme(): string {
-    if (!empty($_GET['theme']) && in_array($_GET['theme'], ['light', 'dark'], true)) {
-        set_theme($_GET['theme']);
-    }
     if (!empty($_SESSION['theme'])) {
         return $_SESSION['theme'];
     }
@@ -130,21 +131,6 @@ function tr(string $key): string {
             'adminDesc' => 'Gestión del sistema',
             'loginPin' => 'PIN de acceso',
             'loginEmail' => 'Correo y contraseña',
-            'employeeDashboardTitle' => 'Dashboard Empleado',
-            'adminDashboardTitle' => 'Panel Administrativo',
-            'scheduleControl' => 'Control de horario',
-            'inProgress' => 'En curso',
-            'attendanceHistoryTitle' => 'Historial de asistencias',
-            'totalHoursToday' => 'Total de Horas — Hoy',
-            'activeEmployees' => 'Empleados activos',
-            'alerts' => 'Alertas',
-            'registerExit' => 'Registrar Salida',
-            'addEmployee' => 'Agregar Empleado',
-            'employeeManagementTitle' => 'Gestión de Empleados',
-            'export' => 'Exportar',
-            'adminPanel' => 'Panel Administrativo',
-            'controlDeHoras' => 'Control de Horas',
-            'mySchedule' => 'Mi horario',
         ],
         'en' => [
             'loginTitle' => 'Login',
@@ -220,21 +206,6 @@ function tr(string $key): string {
             'adminDesc' => 'System management',
             'loginPin' => 'PIN access',
             'loginEmail' => 'Email and password',
-            'employeeDashboardTitle' => 'Employee Dashboard',
-            'adminDashboardTitle' => 'Admin Panel',
-            'scheduleControl' => 'Schedule Control',
-            'inProgress' => 'In progress',
-            'attendanceHistoryTitle' => 'Attendance History',
-            'totalHoursToday' => 'Total Hours — Today',
-            'activeEmployees' => 'Active employees',
-            'alerts' => 'Alerts',
-            'registerExit' => 'Register Exit',
-            'addEmployee' => 'Add Employee',
-            'employeeManagementTitle' => 'Employee Management',
-            'export' => 'Export',
-            'adminPanel' => 'Admin Panel',
-            'controlDeHoras' => 'Hours Control',
-            'mySchedule' => 'My schedule',
         ],
     ];
 

@@ -1,3 +1,4 @@
+
 <?php
 require_once __DIR__ . '/common.php';
 require_login();
@@ -6,31 +7,20 @@ if ($user['role'] !== 'admin') {
     header('Location: dashboard_employee.php');
     exit;
 }
-
-$adminStatus = get_employee_status($user['id']);
+ 
 $filter = $_GET['filter'] ?? 'all';
 $search = trim($_GET['search'] ?? '');
 $dateFilter = $_GET['date'] ?? '';
 $employeeFilter = $_GET['employee'] ?? '';
-
+ 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!empty($_POST['action']) && $_POST['action'] === 'admin_clock_in') {
-        if (get_employee_status($user['id']) === 'inactive') {
-            db()->prepare('INSERT INTO attendance (user_id, date, entry, `exit`, total_hours) VALUES (?, ?, ?, NULL, 0)')
-                ->execute([$user['id'], date('Y-m-d'), date('Y-m-d H:i:s')]);
-        }
-        header('Location: dashboard_admin.php');
-        exit;
-    }
-    if (!empty($_POST['action']) && $_POST['action'] === 'admin_clock_out') {
-        $stmt = db()->prepare('SELECT id, entry FROM attendance WHERE user_id = ? AND `exit` IS NULL ORDER BY id DESC LIMIT 1');
-        $stmt->execute([$user['id']]);
-        $rec = $stmt->fetch();
-        if ($rec) {
-            $exit = time();
-            $total = round(($exit - strtotime($rec['entry'])) / 3600, 2);
+    if (!empty($_POST['action']) && $_POST['action'] === 'clock_out_all') {
+        $now = date('Y-m-d H:i:s');
+        $activeStmt = db()->query('SELECT id, entry FROM attendance WHERE `exit` IS NULL');
+        foreach ($activeStmt->fetchAll() as $rec) {
+            $total = round((strtotime($now) - strtotime($rec['entry'])) / 3600, 2);
             db()->prepare('UPDATE attendance SET `exit` = ?, total_hours = ? WHERE id = ?')
-                ->execute([date('Y-m-d H:i:s', $exit), $total, $rec['id']]);
+                ->execute([$now, $total, $rec['id']]);
         }
         header('Location: dashboard_admin.php');
         exit;
@@ -81,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
-
+ 
 $query = 'SELECT u.*, a.`exit` IS NULL AS active, a.entry AS current_entry, a.`exit` AS current_exit, a.total_hours AS current_total_hours
           FROM users u
           LEFT JOIN attendance a ON a.user_id = u.id AND a.id = (
@@ -89,7 +79,7 @@ $query = 'SELECT u.*, a.`exit` IS NULL AS active, a.entry AS current_entry, a.`e
           )
           WHERE u.role = "employee"';
 $params = [];
-
+ 
 if ($filter === 'active') {
     $query .= ' AND a.`exit` IS NULL';
 }
@@ -106,7 +96,7 @@ $query .= ' ORDER BY u.first_name, u.last_name';
 $stmt = db()->prepare($query);
 $stmt->execute($params);
 $employees = $stmt->fetchAll();
-
+ 
 $attendanceQuery = 'SELECT at.*, u.first_name, u.last_name, u.pin FROM attendance at JOIN users u ON at.user_id = u.id WHERE 1=1';
 $attendanceParams = [];
 if ($dateFilter) {
@@ -123,7 +113,7 @@ $attendanceQuery .= ' ORDER BY at.entry DESC LIMIT 40';
 $attendanceStmt = db()->prepare($attendanceQuery);
 $attendanceStmt->execute($attendanceParams);
 $attendanceRecords = $attendanceStmt->fetchAll();
-
+ 
 $today = date('Y-m-d');
 $totalHoursTodayStmt = db()->prepare('SELECT COALESCE(SUM(total_hours), 0) AS total FROM attendance WHERE date = ?');
 $totalHoursTodayStmt->execute([$today]);
@@ -137,7 +127,7 @@ foreach ($employees as $employee) {
 }
 $alertsCount = 0;
 $timeNow = date('H:i:s');
-
+ 
 layout_header(tr('adminDashboard'));
 ?>
 <div class="min-h-screen bg-background px-4 py-10 text-foreground">
@@ -147,8 +137,8 @@ layout_header(tr('adminDashboard'));
         <div class="flex items-center gap-4">
           <div class="grid h-16 w-16 place-items-center rounded-3xl bg-primary text-white shadow-xl">⏱️</div>
           <div>
-            <p class="text-xs uppercase tracking-[0.32em] text-primary/80">CronoHoras &nbsp;·&nbsp; Control de Horas</p>
-            <h1 class="mt-2 text-3xl font-semibold"><?php echo tr('adminPanel'); ?></h1>
+            <p class="text-xs uppercase tracking-[0.32em] text-primary/80">Control de Horas</p>
+            <h1 class="mt-2 text-3xl font-semibold">Panel administrativo</h1>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
@@ -160,57 +150,52 @@ layout_header(tr('adminDashboard'));
         </div>
       </div>
     </section>
-
+ 
     <section class="grid gap-4 xl:grid-cols-[1.6fr,1fr]">
       <div class="grid gap-4 md:grid-cols-3">
         <div class="metric-card">
-          <h3><?php echo tr('totalHoursToday'); ?></h3>
+          <h3>Total de Horas</h3>
           <p class="metric-value"><?php echo number_format($totalHoursToday, 1, '.', ''); ?>h</p>
         </div>
         <div class="metric-card">
-          <h3><?php echo tr('activeEmployees'); ?></h3>
+          <h3>Empleados activos</h3>
           <p class="metric-value"><?php echo htmlspecialchars($activeEmployees . '/' . $employeeCount); ?></p>
         </div>
         <div class="metric-card">
-          <h3><?php echo tr('alerts'); ?></h3>
+          <h3>Alertas</h3>
           <p class="metric-value"><?php echo $alertsCount; ?></p>
         </div>
       </div>
       <div class="status-card p-6">
         <div class="card-header">
           <div>
-            <p class="text-sm font-semibold text-slate-500"><?php echo tr('registerExit'); ?></p>
-            <p class="mt-2 text-lg font-semibold text-slate-900"><?php echo $activeEmployees > 0 ? tr('inProgress') . ' • ' . htmlspecialchars($timeNow) : tr('inactive') . ' • ' . htmlspecialchars($timeNow); ?></p>
+            <p class="text-sm font-semibold text-slate-500">Registrar Salida</p>
+            <p class="mt-2 text-lg font-semibold text-slate-900"><?php echo $activeEmployees > 0 ? 'En curso • ' . htmlspecialchars($timeNow) : 'Inactivo • ' . htmlspecialchars($timeNow); ?></p>
           </div>
           <form method="post">
-            <?php if ($adminStatus === 'inactive'): ?>
-              <input type="hidden" name="action" value="admin_clock_in">
-              <button type="submit" class="btn-primary"><?php echo tr('clockIn'); ?></button>
-            <?php else: ?>
-              <input type="hidden" name="action" value="admin_clock_out">
-              <button type="submit" class="btn-success"><?php echo tr('clockOut'); ?></button>
-            <?php endif; ?>
-          </form>
+              <input type="hidden" name="action" value="clock_out_all">
+              <button type="submit" class="btn-success">Registrar Salida</button>
+            </form>
         </div>
       </div>
     </section>
-
+ 
     <section class="page-panel p-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-xl font-semibold"><?php echo tr('totalHoursToday'); ?></h2>
+          <h2 class="text-xl font-semibold">Total de Horas — Hoy</h2>
         </div>
-        <button type="button" class="btn-secondary"><?php echo tr('export'); ?></button>
+        <button type="button" class="btn-secondary">Exportar</button>
       </div>
       <div class="chart-panel mt-6"></div>
     </section>
-
+ 
     <section class="page-panel p-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-2xl font-semibold"><?php echo tr('employeeManagementTitle'); ?></h2>
+          <h2 class="text-2xl font-semibold">Gestión de Empleados</h2>
         </div>
-        <a href="#employee-form" class="btn-primary"><?php echo tr('addEmployee'); ?></a>
+        <a href="#employee-form" class="btn-primary">Agregar Empleado</a>
       </div>
       <div class="overflow-x-auto mt-6">
         <table class="table-clean">
@@ -246,7 +231,7 @@ layout_header(tr('adminDashboard'));
         </table>
       </div>
     </section>
-
+ 
     <section id="employee-form" class="page-panel p-8">
       <h2 class="text-2xl font-semibold"><?php echo tr('employeeManagement'); ?></h2>
       <?php $editUser = null; if (!empty($_GET['edit_id'])): ?>
@@ -291,9 +276,9 @@ layout_header(tr('adminDashboard'));
         </div>
       </form>
     </section>
-
+ 
     <section id="attendance-history" class="page-panel p-8">
-      <h2 class="text-2xl font-semibold"><?php echo tr('attendanceHistoryTitle'); ?></h2>
+      <h2 class="text-2xl font-semibold">Historial de asistencias</h2>
       <div class="overflow-x-auto mt-6">
         <table class="table-clean">
           <thead>
@@ -329,5 +314,6 @@ layout_header(tr('adminDashboard'));
     </section>
   </main>
 </div>
-
+ 
 <?php layout_footer();
+ 
