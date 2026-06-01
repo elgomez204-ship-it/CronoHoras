@@ -23,9 +23,48 @@ CREATE TABLE IF NOT EXISTS attendance (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+USE cronohoras;
 
-INSERT IGNORE INTO users (pin, role, first_name, last_name, email, locale, theme)
-VALUES
-  ('1111', 'employee', 'Ana', 'González', 'ana.gonzalez@empresa.com', 'es', 'light'),
-  ('2222', 'employee', 'Luis', 'Martínez', 'luis.martinez@empresa.com', 'es', 'light'),
-  ('9999', 'admin', 'Marta', 'Ríos', 'marta.rios@empresa.com', 'es', 'dark');
+-- Tabla de empresas
+CREATE TABLE IF NOT EXISTS companies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    sector VARCHAR(100),
+    color VARCHAR(7) DEFAULT '#2563eb',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de departamentos
+CREATE TABLE IF NOT EXISTS departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    company_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+);
+
+-- Agregar columnas a users
+ALTER TABLE users ADD COLUMN company_id INT DEFAULT NULL;
+ALTER TABLE users ADD COLUMN department_id INT DEFAULT NULL;
+
+-- Insertar las dos empresas
+INSERT INTO companies (id, name, sector, color) VALUES
+(1, 'Maersk', 'Logística', '#0057a8'),
+(2, 'Nexus Tech', 'Tecnología', '#7c3aed');
+
+-- Insertar departamentos Maersk
+INSERT INTO departments (company_id, name) VALUES
+(1, 'Operaciones'),
+(1, 'Almacén'),
+(1, 'Logística'),
+(1, 'Transporte'),
+(1, 'Administración');
+
+-- Insertar departamentos Nexus Tech
+INSERT INTO departments (company_id, name) VALUES
+(2, 'Desarrollo'),
+(2, 'QA'),
+(2, 'Diseño'),
+(2, 'Soporte Técnico'),
+(2, 'Administración');
+
+EXIT;

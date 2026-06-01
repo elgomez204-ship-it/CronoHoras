@@ -638,3 +638,29 @@ body.dark .chart-panel {
   background: #1e293b !important;
   border-color: #334155 !important;
 }
+
+/* Fix dark mode - topbar pills and time */
+body.dark .rounded-full,
+body.dark span.rounded-full,
+body.dark #dashboard_time {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+body.dark .topbar-card * {
+  color: #f1f5f9 !important;
+}
+body.dark .topbar-card .btn-secondary {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+body.dark .text-slate-700,
+body.dark .text-slate-600,
+body.dark .text-slate-500,
+body.dark .text-slate-900 {
+  color: #f1f5f9 !important;
+}
+body.dark .bg-slate-100 {
+  background: #1e293b !important;
+}

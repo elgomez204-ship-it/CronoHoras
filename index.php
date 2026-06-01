@@ -144,7 +144,7 @@ layout_header(tr('loginTitle'));
       </form>
 
       <div class="mt-6 text-center text-sm text-slate-500">
-        ¿No tienes cuenta? <a href="register.php" class="link"><?php echo tr('createAccount'); ?></a>
+        ¿No tienes cuenta? <a href="register.php" style="color:#2563eb;font-weight:700;text-decoration:none;"><?php echo tr('createAccount'); ?></a>
       </div>
     </section>
   </main>

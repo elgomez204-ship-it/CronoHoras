@@ -7,13 +7,43 @@ if ($user['role'] !== 'admin') {
     header('Location: dashboard_employee.php');
     exit;
 }
- 
+
+if (empty($_SESSION['company_id'])) {
+    header('Location: company_select.php');
+    exit;
+}
+$companyId = (int)$_SESSION['company_id'];
+$companyName = $_SESSION['company_name'] ?? '';
+$companyColor = $_SESSION['company_color'] ?? '#2563eb';
+$adminStatus = get_employee_status($user['id']);
+
 $filter = $_GET['filter'] ?? 'all';
 $search = trim($_GET['search'] ?? '');
 $dateFilter = $_GET['date'] ?? '';
 $employeeFilter = $_GET['employee'] ?? '';
  
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!empty($_POST['action']) && $_POST['action'] === 'admin_clock_in') {
+        if (get_employee_status($user['id']) === 'inactive') {
+            db()->prepare('INSERT INTO attendance (user_id, date, entry, `exit`, total_hours) VALUES (?, ?, ?, NULL, 0)')
+                ->execute([$user['id'], date('Y-m-d'), date('Y-m-d H:i:s')]);
+        }
+        header('Location: dashboard_admin.php');
+        exit;
+    }
+    if (!empty($_POST['action']) && $_POST['action'] === 'admin_clock_out') {
+        $stmt = db()->prepare('SELECT id, entry FROM attendance WHERE user_id = ? AND `exit` IS NULL ORDER BY id DESC LIMIT 1');
+        $stmt->execute([$user['id']]);
+        $rec = $stmt->fetch();
+        if ($rec) {
+            $exit = time();
+            $total = round(($exit - strtotime($rec['entry'])) / 3600, 2);
+            db()->prepare('UPDATE attendance SET `exit` = ?, total_hours = ? WHERE id = ?')
+                ->execute([date('Y-m-d H:i:s', $exit), $total, $rec['id']]);
+        }
+        header('Location: dashboard_admin.php');
+        exit;
+    }
     if (!empty($_POST['action']) && $_POST['action'] === 'clock_out_all') {
         $now = date('Y-m-d H:i:s');
         $activeStmt = db()->query('SELECT id, entry FROM attendance WHERE `exit` IS NULL');
@@ -33,8 +63,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($firstName && $lastName) {
             $pin = generate_pin();
             $passwordHash = $password ? password_hash($password, PASSWORD_BCRYPT) : null;
-            db()->prepare('INSERT INTO users (pin, role, first_name, last_name, email, password, locale, theme) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-                ->execute([$pin, 'employee', $firstName, $lastName, $email, $passwordHash, current_locale(), current_theme()]);
+            $deptId = !empty($_POST['department_id']) ? (int)$_POST['department_id'] : null;
+            db()->prepare('INSERT INTO users (pin, role, first_name, last_name, email, password, locale, theme, company_id, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                ->execute([$pin, 'employee', $firstName, $lastName, $email, $passwordHash, current_locale(), current_theme(), $companyId, $deptId]);
             header('Location: dashboard_admin.php');
             exit;
         }
@@ -72,12 +103,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
  
-$query = 'SELECT u.*, a.`exit` IS NULL AS active, a.entry AS current_entry, a.`exit` AS current_exit, a.total_hours AS current_total_hours
+$query = "SELECT u.*, a.`exit` IS NULL AS active, a.entry AS current_entry, a.`exit` AS current_exit, a.total_hours AS current_total_hours
           FROM users u
           LEFT JOIN attendance a ON a.user_id = u.id AND a.id = (
             SELECT id FROM attendance WHERE user_id = u.id ORDER BY id DESC LIMIT 1
           )
-          WHERE u.role = "employee"';
+          WHERE u.role = 'employee' AND u.company_id = " . (int)$companyId;
 $params = [];
  
 if ($filter === 'active') {
@@ -138,7 +169,7 @@ layout_header(tr('adminDashboard'));
           <div class="grid h-16 w-16 place-items-center rounded-3xl bg-primary text-white shadow-xl">⏱️</div>
           <div>
             <p class="text-xs uppercase tracking-[0.32em] text-primary/80">Control de Horas</p>
-            <h1 class="mt-2 text-3xl font-semibold">Panel administrativo</h1>
+            <h1 class="mt-2 text-3xl font-semibold"><?php echo tr('adminPanel'); ?></h1>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
@@ -146,6 +177,7 @@ layout_header(tr('adminDashboard'));
           <span class="rounded-full bg-slate-100 px-4 py-2 text-sm text-slate-600"><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?> (<?php echo htmlspecialchars($user['role']); ?>)</span>
           <a href="?locale=<?php echo current_locale() === 'es' ? 'en' : 'es'; ?>" class="topbar-pill"><?php echo strtoupper(current_locale() === 'es' ? 'EN' : 'ES'); ?></a>
           <a href="?theme=<?php echo current_theme() === 'light' ? 'dark' : 'light'; ?>" class="topbar-pill">🌓</a>
+          <a href="company_select.php" class="topbar-pill">🏢 <?php echo htmlspecialchars($companyName); ?></a>
           <a href="logout.php" class="btn-secondary"><?php echo tr('logout'); ?></a>
         </div>
       </div>
@@ -169,12 +201,18 @@ layout_header(tr('adminDashboard'));
       <div class="status-card p-6">
         <div class="card-header">
           <div>
-            <p class="text-sm font-semibold text-slate-500">Registrar Salida</p>
-            <p class="mt-2 text-lg font-semibold text-slate-900"><?php echo $activeEmployees > 0 ? 'En curso • ' . htmlspecialchars($timeNow) : 'Inactivo • ' . htmlspecialchars($timeNow); ?></p>
+            <p class="text-sm font-semibold text-slate-500"><?php echo tr('mySchedule'); ?></p>
+            <p class="mt-2 text-lg font-semibold text-slate-900"><?php echo $adminStatus === 'active' ? tr('inProgress') . ' • ' . htmlspecialchars($timeNow) : tr('inactive') . ' • ' . htmlspecialchars($timeNow); ?></p>
           </div>
           <form method="post">
               <input type="hidden" name="action" value="clock_out_all">
-              <button type="submit" class="btn-success">Registrar Salida</button>
+              <?php if ($adminStatus === 'inactive'): ?>
+              <input type="hidden" name="action" value="admin_clock_in">
+              <button type="submit" class="btn-primary"><?php echo tr('clockIn'); ?></button>
+              <?php else: ?>
+              <input type="hidden" name="action" value="admin_clock_out">
+              <button type="submit" class="btn-success"><?php echo tr('clockOut'); ?></button>
+              <?php endif; ?>
             </form>
         </div>
       </div>
@@ -183,9 +221,9 @@ layout_header(tr('adminDashboard'));
     <section class="page-panel p-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-xl font-semibold">Total de Horas — Hoy</h2>
+          <h2 class="text-xl font-semibold"><?php echo tr('totalHoursToday'); ?></h2>
         </div>
-        <button type="button" class="btn-secondary">Exportar</button>
+        <a href="export.php" class="btn-secondary"><?php echo tr('export'); ?></a>
       </div>
       <div class="chart-panel mt-6"></div>
     </section>
@@ -193,9 +231,9 @@ layout_header(tr('adminDashboard'));
     <section class="page-panel p-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-2xl font-semibold">Gestión de Empleados</h2>
+          <h2 class="text-2xl font-semibold"><?php echo tr('employeeManagementTitle'); ?></h2>
         </div>
-        <a href="#employee-form" class="btn-primary">Agregar Empleado</a>
+        <a href="#employee-form" class="btn-primary"><?php echo tr('addEmployee'); ?></a>
       </div>
       <div class="overflow-x-auto mt-6">
         <table class="table-clean">
@@ -204,6 +242,7 @@ layout_header(tr('adminDashboard'));
               <th>NOMBRE</th>
               <th>ROL</th>
               <th>PIN DE 6 DÍGITOS</th>
+              <th>DEPARTAMENTO</th>
               <th>ACCIONES</th>
             </tr>
           </thead>
@@ -216,6 +255,15 @@ layout_header(tr('adminDashboard'));
                   <td><?php echo htmlspecialchars($employee['first_name'] . ' ' . $employee['last_name']); ?></td>
                   <td><span class="pill<?php echo $employee['role'] === 'admin' ? ' pill-active' : ''; ?>"><?php echo htmlspecialchars($employee['role'] === 'admin' ? tr('admin') : tr('employee')); ?></span></td>
                   <td><?php echo htmlspecialchars($employee['pin'] ?? '-'); ?></td>
+                  <td><?php
+                $dname = '';
+                if (!empty($employee['department_id'])) {
+                    $ds = db()->prepare('SELECT name FROM departments WHERE id = ?');
+                    $ds->execute([$employee['department_id']]);
+                    $dname = $ds->fetchColumn() ?: '-';
+                }
+                echo htmlspecialchars($dname ?: '-');
+              ?></td>
                   <td class="flex gap-2">
                     <a class="btn-secondary" href="dashboard_admin.php?edit_id=<?php echo $employee['id']; ?>#employee-form">✏️</a>
                     <form method="post" class="inline" onsubmit="return confirm('<?php echo tr('confirmDelete'); ?>');">
@@ -264,6 +312,21 @@ layout_header(tr('adminDashboard'));
             <input type="password" name="password" class="input mt-2" placeholder="<?php echo tr('passwordPlaceholder'); ?>">
           </div>
           <div>
+            <label class="block text-sm font-semibold text-foreground">Departamento</label>
+            <select name="department_id" class="input mt-2">
+              <option value="">Sin departamento</option>
+              <?php
+              $deptStmt = db()->prepare('SELECT id, name FROM departments WHERE company_id = ? ORDER BY name');
+              $deptStmt->execute([$companyId]);
+              foreach ($deptStmt->fetchAll() as $dept):
+              ?>
+              <option value="<?php echo $dept['id']; ?>" <?php echo (isset($editUser) && $editUser && $editUser['department_id'] == $dept['id']) ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($dept['name']); ?>
+              </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div>
             <label class="block text-sm font-semibold text-foreground"><?php echo tr('generatedPin'); ?></label>
             <input type="text" name="pin" class="input mt-2" value="<?php echo htmlspecialchars($editUser['pin'] ?? generate_pin()); ?>" readonly>
           </div>
@@ -278,7 +341,7 @@ layout_header(tr('adminDashboard'));
     </section>
  
     <section id="attendance-history" class="page-panel p-8">
-      <h2 class="text-2xl font-semibold">Historial de asistencias</h2>
+      <h2 class="text-2xl font-semibold"><?php echo tr('attendanceHistoryTitle'); ?></h2>
       <div class="overflow-x-auto mt-6">
         <table class="table-clean">
           <thead>
